@@ -1,45 +1,37 @@
 using CliWrap;
-using KarlCube.Games.Achtung;
+using LedCube.Games.Achtung;
 using MassTransit;
 using RPiRgbLEDMatrix;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Color = RPiRgbLEDMatrix.Color;
-using KarlCube.Games.Shared;
-using KarlCube.Games.Snake;
-using SnakeGameContext = KarlCube.Games.Snake.GameContext;
-using GameObject = KarlCube.Games.Snake.GameObject;
+using LedCube.Games.Shared;
+using LedCube.Games.Snake;
+using SnakeGameContext = LedCube.Games.Snake.GameContext;
+using GameObject = LedCube.Games.Snake.GameObject;
 using Cube.Contracts;
+using DoomSharp.Core;
+using DoomSharp.Core.Data;
+using LedCube.Games.Doom;
 
-namespace KarlCube;
+namespace LedCube;
 
-public class GameHostedService : IHostedService
+public class GameHostedService(
+    IBus bus,
+    MediaHandler mediaHandler) : IHostedService
 {
-    private readonly ILogger<GameHostedService> _logger;
-    private readonly IBus _bus;
-    private readonly SnakeGame _snakeGame;
+    private readonly SnakeGame _snakeGame = new();
     private SnakeGameContext _snakeGameCtx;
-    private readonly AchtungGame _achtungGame;
+    private readonly AchtungGame _achtungGame = new();
     private AchtungGameContext _achtungGameCtx;
-    private readonly CubeContext _cubeCtx;
-    private readonly ScreenSaver _screenSaver;
+    private readonly CubeContext _cubeCtx = new();
 
-    public GameHostedService(
-        ILogger<GameHostedService> logger,
-        IBus bus,
-        ScreenSaver screenSaver)
-    {
-        _logger = logger;
-        _bus = bus;
-        _cubeCtx = new CubeContext();
-        _screenSaver = screenSaver;
-        _snakeGame = new SnakeGame();
-        _achtungGame = new AchtungGame();
-    }
     public Task StartAsync(CancellationToken cancellationToken)
     {
         ConfigureGamepads(cancellationToken);
-        Task.Run(_screenSaver.StartCycle, cancellationToken);
+        Task.Run(mediaHandler.StartCycle, cancellationToken);
+        WadFileCollection.Init(new WadStreamProvider());
+        DoomGame.SetOutputRenderer(Graphics.Instance);
         return Task.CompletedTask;
     }
     
@@ -81,7 +73,7 @@ public class GameHostedService : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _screenSaver.Dispose();
+        mediaHandler.Dispose();
         foreach (var player in _cubeCtx.Players)
         {
             player.Gamepad.Dispose();
@@ -92,32 +84,11 @@ public class GameHostedService : IHostedService
     private async Task PlaySnake(int playerId)
     {
         _cubeCtx.State = State.Playing;
-        _screenSaver.Dispose();
-        await _bus.Publish(new GameStarted());
-        await Cli.Wrap("/home/pi/rpi-rgb-led-matrix/utils/led-image-viewer")
-            .WithArguments(new[]
-            {
-                "-l 1",
-                "-D 100",
-                "/home/pi/workshop/cube-snake/KarlCube/images/countdown.gif",
-                "--led-rows=64",
-                "--led-cols=64",
-                "--led-gpio-mapping=adafruit-hat-pwm",
-                "--led-slowdown-gpio=2",
-                "--led-brightness=40",
-                "--led-no-drop-privs"
-            }).ExecuteAsync();
+        mediaHandler.Dispose();
+        Task.Run(() => bus.Publish(new GameStarted()));
+        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, CancellationToken.None);
 
-        var matrix = new RGBLedMatrix(new RGBLedMatrixOptions
-        {
-            Cols = 64,
-            Rows = 64,
-            ChainLength = 5,
-            HardwareMapping = "adafruit-hat-pwm",
-            Brightness = 80,
-            GpioSlowdown = 2,
-            DropPrivileges = false
-        });
+        var matrix = CreateRgbLedMatrix();
         
         var canvas = matrix.CreateOffscreenCanvas();
         _snakeGameCtx = _snakeGame.CreateGameContext();
@@ -168,54 +139,19 @@ public class GameHostedService : IHostedService
         canvas.Clear();
         matrix.Dispose();
         
-        await _bus.Publish(new GameEnded(_snakeGameCtx.Score));
-
-        await Cli.Wrap("/home/pi/rpi-rgb-led-matrix/utils/led-image-viewer")
-            .WithArguments(new[]
-            {
-                "-l 2",
-                "-D 100",
-                "/home/pi/workshop/cube-snake/KarlCube/images/gameover.gif",
-                "--led-rows=64",
-                "--led-cols=64",
-                "--led-gpio-mapping=adafruit-hat-pwm",
-                "--led-slowdown-gpio=2",
-                "--led-brightness=50",
-                "--led-no-drop-privs"
-            }).ExecuteAsync();
+        Task.Run(() => bus.Publish(new GameEnded(_snakeGameCtx.Score)));
 
         _cubeCtx.State = State.Idle;
-        Task.Run(_screenSaver.StartCycle);
+        Task.Run(mediaHandler.StartCycle);
     }
-    
+
     private async Task PlayAchtung()
     {
         _cubeCtx.State = State.Playing;
-        _screenSaver.Dispose();
-        await Cli.Wrap("/home/pi/rpi-rgb-led-matrix/utils/led-image-viewer")
-            .WithArguments(new[]
-            {
-                "-l 1",
-                "-D 100",
-                "/home/pi/workshop/cube-snake/KarlCube/images/countdown.gif",
-                "--led-rows=64",
-                "--led-cols=64",
-                "--led-gpio-mapping=adafruit-hat-pwm",
-                "--led-slowdown-gpio=2",
-                "--led-brightness=40",
-                "--led-no-drop-privs"
-            }).ExecuteAsync();
+        mediaHandler.Dispose();
+        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, CancellationToken.None);
 
-        var matrix = new RGBLedMatrix(new RGBLedMatrixOptions
-        {
-            Cols = 64,
-            Rows = 64,
-            ChainLength = 5,
-            HardwareMapping = "adafruit-hat-pwm",
-            Brightness = 80,
-            GpioSlowdown = 2,
-            DropPrivileges = false
-        });
+        var matrix = CreateRgbLedMatrix();
         
         var canvas = matrix.CreateOffscreenCanvas();
         _achtungGameCtx = _achtungGame.CreateGameContext();
@@ -229,13 +165,13 @@ public class GameHostedService : IHostedService
                     var obj = _achtungGameCtx.Map[x, y];
                     switch (obj)
                     {
-                        case KarlCube.Games.Achtung.GameObject.Ground:
+                        case LedCube.Games.Achtung.GameObject.Ground:
                             canvas.SetPixel(x, y, new Color(0, 0, 0));
                             break;
-                        case KarlCube.Games.Achtung.GameObject.BlueDot:
+                        case LedCube.Games.Achtung.GameObject.BlueDot:
                             canvas.SetPixel(x, y, new Color(0, 0, 255));
                             break;
-                        case KarlCube.Games.Achtung.GameObject.RedDot:
+                        case LedCube.Games.Achtung.GameObject.RedDot:
                             canvas.SetPixel(x, y, new Color(255, 0, 0));
                             break;
                         default:
@@ -265,17 +201,16 @@ public class GameHostedService : IHostedService
         } while (!_achtungGameCtx.Players.Any(p => p.Dead));
         
         var winner = _achtungGameCtx.Players.First(p => !p.Dead);
-        await _bus.Publish(new MultiPlayerGameEnded(
-            winner.Color == KarlCube.Games.Achtung.GameObject.RedDot ? "red" : "blue"));
+        Task.Run(() => bus.Publish(new MultiPlayerGameEnded(
+            winner.Color == LedCube.Games.Achtung.GameObject.RedDot ? "red" : "blue")));
         for (var x = 0; x < _achtungGameCtx.Map.GetLength(0); x++)
         {
             for (var y = 0; y < _achtungGameCtx.Map.GetLength(1); y++)
             {
-                 if(winner.Color == KarlCube.Games.Achtung.GameObject.RedDot){
-                    canvas.SetPixel(x, y, new Color(255, 0, 0));
-                 } else {
-                    canvas.SetPixel(x, y, new Color(0, 0, 255));
-                 }
+                canvas.SetPixel(x, y,
+                    winner.Color == LedCube.Games.Achtung.GameObject.RedDot
+                        ? new Color(255, 0, 0)
+                        : new Color(0, 0, 255));
             }
             await Task.Delay(5);
             matrix.SwapOnVsync(canvas);
@@ -285,15 +220,33 @@ public class GameHostedService : IHostedService
         matrix.Dispose();
 
         _cubeCtx.State = State.Idle;
-        Task.Run(_screenSaver.StartCycle);
+        Task.Run(mediaHandler.StartCycle);
     }
+
+    private async Task RunDoom()
+    {
+        await Task.Run(DoomGame.Instance.RunAsync);
+    } 
 
     private async Task RunStatusTick()
     {
         do
         {
-            await _bus.Publish(new StatusTicked(_snakeGameCtx.Score, _snakeGameCtx.StepsLeft));
+            await bus.Publish(new StatusTicked(_snakeGameCtx.Score, _snakeGameCtx.StepsLeft));
             await Task.Delay(1000);
         } while (!_snakeGameCtx.Dead);
+    }
+    
+    private static RGBLedMatrix CreateRgbLedMatrix()
+    {
+        return new RGBLedMatrix(new RGBLedMatrixOptions
+        {
+            Cols = 64,
+            Rows = 64,
+            ChainLength = 5,
+            HardwareMapping = "adafruit-hat-pwm",
+            Brightness = 80,
+            GpioSlowdown = 2
+        });
     }
 }

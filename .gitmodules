@@ -1,0 +1,6 @@
+[submodule "src/rpi-rgb-led-matrix"]
+	path = src/rpi-rgb-led-matrix
+	url = git@github.com:CosX/rpi-rgb-led-matrix.git
+[submodule "src/doom-sharp"]
+	path = src/doom-sharp
+	url = git@github.com:CosX/doom-sharp.git

@@ -1,6 +1,6 @@
-using KarlCube.Games.Shared;
+using LedCube.Games.Shared;
 
-namespace KarlCube.Games.Snake;
+namespace LedCube.Games.Snake;
 
 public record GameContext
 {

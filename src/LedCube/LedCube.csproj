@@ -5,7 +5,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>KarlCube</RootNamespace>
+        <RootNamespace>LedCube</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,26 +14,12 @@
         <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="8.1.2" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
         <PackageReference Include="Gamepad" Version="1.1.0" />
-        <PackageReference Include="Iot.Device.Bindings" Version="3.1.0" />
-        <PackageReference Include="System.Device.Gpio" Version="3.1.0" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="../../rpi-rgb-led-matrix/bindings/c#/RPiRgbLEDMatrix.csproj" />
-      
+      <ProjectReference Include="..\rpi-rgb-led-matrix\bindings\c#\RPiRgbLEDMatrix.csproj" />
+      <ProjectReference Include="..\doom-sharp\src\DoomSharp.Core\DoomSharp.Core.csproj" />
     </ItemGroup>
-
-    <!-- <ItemGroup>
-      <Reference Include="RGBLedMatrix">
-        <HintPath>RGBLedMatrix.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="librgbmatrix.so" />
-      <Content Include="librgbmatrix.so">
-        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      </Content>
-    </ItemGroup> -->
 
 </Project>

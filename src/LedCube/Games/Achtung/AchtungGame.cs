@@ -1,6 +1,6 @@
-using KarlCube.Games.Shared;
+using LedCube.Games.Shared;
 
-namespace KarlCube.Games.Achtung;
+namespace LedCube.Games.Achtung;
 
 public class AchtungGame
 {

@@ -1,4 +1,4 @@
-namespace KarlCube.Games.Shared;
+namespace LedCube.Games.Shared;
 
 public static class GetDirection {
     public static Direction TurnLeft(Direction currentDirection)

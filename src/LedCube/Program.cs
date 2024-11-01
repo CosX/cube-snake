@@ -1,4 +1,4 @@
-﻿using KarlCube;
+﻿using LedCube;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -16,7 +16,7 @@ var host = Host.CreateDefaultBuilder(args)
         });
         services.AddHostedService<GameHostedService>();
         services.AddSingleton<CubeContext>();
-        services.AddSingleton<ScreenSaver>();
+        services.AddSingleton<MediaHandler>();
     })
     .Build();
 

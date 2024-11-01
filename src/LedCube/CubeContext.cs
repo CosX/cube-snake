@@ -1,6 +1,6 @@
 using Gamepad;
 
-namespace KarlCube;
+namespace LedCube;
 
 public class CubeContext
 {
