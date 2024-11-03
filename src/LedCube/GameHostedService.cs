@@ -1,18 +1,16 @@
-using CliWrap;
 using LedCube.Games.Achtung;
 using MassTransit;
 using RPiRgbLEDMatrix;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Color = RPiRgbLEDMatrix.Color;
 using LedCube.Games.Shared;
 using LedCube.Games.Snake;
-using SnakeGameContext = LedCube.Games.Snake.GameContext;
-using GameObject = LedCube.Games.Snake.GameObject;
 using Cube.Contracts;
 using DoomSharp.Core;
 using DoomSharp.Core.Data;
 using LedCube.Games.Doom;
+using SnakeGameContext = LedCube.Games.Snake.GameContext;
+using GameObject = LedCube.Games.Snake.GameObject;
+using Color = RPiRgbLEDMatrix.Color;
 
 namespace LedCube;
 

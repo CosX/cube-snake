@@ -11,23 +11,23 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
     private bool IsPlayingGame;
     private readonly ScreenSaver _defaultScreenSaver = new("martin_snake_5_sides.gif", 80, 5);
     
-    private readonly IEnumerable<ScreenSaver> _defaultScreenSavers = new[]
-    {
+    private readonly IEnumerable<ScreenSaver> _defaultScreenSavers =
+    [
         new ScreenSaver("this-is-fine.gif", 30),
         new ScreenSaver("circle.gif", 50),
         new ScreenSaver("illusioncolor.gif", 30),
         new ScreenSaver("star-wars.gif", 40),
-        new ScreenSaver("outline.gif", 100),
-    };
+        new ScreenSaver("outline.gif", 100)
+    ];
     
-    private readonly IEnumerable<ScreenSaver> _christmasScreenSavers = new[]
-    {
+    private readonly IEnumerable<ScreenSaver> _christmasScreenSavers =
+    [
         new ScreenSaver("campfire.gif", 50),
         new ScreenSaver("grinch.gif", 30),
         new ScreenSaver("merry-christmas.gif", 80),
         new ScreenSaver("parrot.gif", 60),
-        new ScreenSaver("santa.gif", 30),
-    };
+        new ScreenSaver("santa.gif", 30)
+    ];
 
     private IEnumerable<ScreenSaver> GetTimeAppropriateScreenSavers()
     {
@@ -97,8 +97,8 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
     public void Dispose()
     {
         IsPlayingGame = true;
-        cancellationTokenSource?.Cancel();
-        cancellationTokenSource?.Dispose();
+        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Dispose();
     }
 }
 

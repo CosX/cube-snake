@@ -41,11 +41,11 @@ public class AchtungGame
         return new AchtungGameContext
         {
             Map = map,
-            Players = new []
-            {
+            Players =
+            [
                 playerOne,
                 playerTwo
-            }
+            ]
         };
     }
     
