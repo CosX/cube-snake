@@ -9,7 +9,7 @@ public class Graphics : IGraphics
 {
     public static readonly Graphics Instance = new();
 
-    private Graphics()
+    public Graphics()
     {
         _stride = (_rectangle.Width * 8 /* bpp */ + 7) / 8;
         _screenBuffer = new byte[_rectangle.Height * _stride];

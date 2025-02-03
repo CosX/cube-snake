@@ -1,24 +1,24 @@
-﻿using RPiRgbLEDMatrix;
+﻿using MassTransit;
+using Microsoft.Extensions.Logging;
+using Cube.Contracts;
+using RPiRgbLEDMatrix;
 
 namespace LedCube.Games.ArtsyFartsy;
 
-public class ArtsyFartsyRunner
+public class ArtsyFartsyRunner(ArtsyFartsyInstance instance, IBus bus, ILogger<ArtsyFartsyRunner> logger)
 {
-    private readonly ArtsyFartsyInstance _instance;
-    private readonly int _width;
-    private readonly int _height;
+    private CancellationTokenSource _cancellationTokenSource;
+    private RGBLedMatrix? _matrix;
 
-    public ArtsyFartsyRunner(ArtsyFartsyInstance instance, int width, int height)
+    public async Task Run()
     {
-        _instance = instance;
-        _width = width;
-        _height = height;
-    }
+        logger.LogInformation("Starting ArtsyFartsyRunner");
+        instance.Start();
+        _cancellationTokenSource = new CancellationTokenSource();
 
-    public void Run()
-    {
-        _instance.Start();
-        var matrix =  new RGBLedMatrix(new RGBLedMatrixOptions
+        await bus.Publish(new CreateArtsyFartsyCanvas());
+
+        _matrix = new RGBLedMatrix(new RGBLedMatrixOptions
         {
             Cols = 64,
             Rows = 64,
@@ -27,19 +27,43 @@ public class ArtsyFartsyRunner
             Brightness = 80,
             GpioSlowdown = 2
         });
-        var canvas = matrix.CreateOffscreenCanvas();
-        
-        while (_instance.IsRunning)
+        var canvas = _matrix.CreateOffscreenCanvas();
+
+        try
         {
-            for (var x = 0; x < _width; x++)
+            while (instance.IsRunning && !_cancellationTokenSource.Token.IsCancellationRequested)
             {
-                for (var y = 0; y < _height; y++)
+                for (var x = 0; x < 5 * 64; x++)
                 {
-                    var color = _instance.GetPixel(x, y);
-                    canvas.SetPixel(x, y, color);
+                    for (var y = 0; y < 64; y++)
+                    {
+                        var color = instance.GetPixel(x, y);
+                        canvas.SetPixel(x, y, color);
+                    }
                 }
+                if (_cancellationTokenSource.Token.IsCancellationRequested)
+                    break;
+                await Task.Run(() => _matrix!.SwapOnVsync(canvas), _cancellationTokenSource.Token);
+                await Task.Delay(1, _cancellationTokenSource.Token);
             }
-            matrix.SwapOnVsync(canvas);
         }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("Loop cancelled.");
+        }
+        finally
+        {
+            canvas.Clear();
+            _matrix.Dispose();
+            logger.LogInformation("Finished cleanup in finally block.");
+        }
+    }
+
+    public async Task Stop()
+    {
+        logger.LogInformation("Stopping ArtsyFartsyRunner");
+        await bus.Publish(new EndArtsyFartsyCanvas());
+        instance.Stop();
+        _cancellationTokenSource?.Cancel();
     }
 }

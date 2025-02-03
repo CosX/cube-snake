@@ -20,7 +20,7 @@ public class CubeContext
         }
     };
 
-    public Player GetActivePlayer(int playerId) =>  Players.First(p => p.Id == playerId);
+    public Player GetActivePlayer(int playerId) => Players.First(p => p.Id == playerId);
 }
 
 public class Player
@@ -34,5 +34,6 @@ public class Player
 public enum State
 {
     Idle,
-    Playing
+    Playing,
+    PlayingArtsyFartsy
 }

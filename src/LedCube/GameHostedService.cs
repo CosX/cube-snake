@@ -7,7 +7,9 @@ using LedCube.Games.Snake;
 using Cube.Contracts;
 using DoomSharp.Core;
 using DoomSharp.Core.Data;
+using LedCube.Games.ArtsyFartsy;
 using LedCube.Games.Doom;
+using Microsoft.Extensions.Logging;
 using SnakeGameContext = LedCube.Games.Snake.GameContext;
 using GameObject = LedCube.Games.Snake.GameObject;
 using Color = RPiRgbLEDMatrix.Color;
@@ -16,7 +18,9 @@ namespace LedCube;
 
 public class GameHostedService(
     IBus bus,
-    MediaHandler mediaHandler) : IHostedService
+    MediaHandler mediaHandler,
+    ILogger<LoggerConsole> logger,
+    ArtsyFartsyRunner artsyFartsyRunner) : IHostedService
 {
     private readonly SnakeGame _snakeGame = new();
     private SnakeGameContext _snakeGameCtx;
@@ -30,9 +34,10 @@ public class GameHostedService(
         Task.Run(mediaHandler.StartCycle, cancellationToken);
         WadFileCollection.Init(new WadStreamProvider());
         DoomGame.SetOutputRenderer(Graphics.Instance);
+        DoomGame.SetConsole(new LoggerConsole(logger));
         return Task.CompletedTask;
     }
-    
+
     private void ConfigureGamepads(CancellationToken cancellationToken)
     {
         foreach (var player in _cubeCtx.Players)
@@ -53,7 +58,7 @@ public class GameHostedService(
                         break;
                 }
             };
-            
+
             player.Gamepad.ButtonChanged += (_, e) =>
             {
                 switch (e.Button)
@@ -63,6 +68,12 @@ public class GameHostedService(
                         break;
                     case 10 when e.Pressed && _cubeCtx.State == State.Idle:
                         Task.Run(PlayAchtung, cancellationToken);
+                        break;
+                    case 9 when e.Pressed && _cubeCtx.State == State.Idle:
+                        Task.Run(StartArtsyFartsy, cancellationToken);
+                        break;
+                    case 8 when e.Pressed && _cubeCtx.State == State.PlayingArtsyFartsy:
+                        Task.Run(StopArtsyFartsy, cancellationToken);
                         break;
                 }
             };
@@ -83,14 +94,15 @@ public class GameHostedService(
     {
         _cubeCtx.State = State.Playing;
         mediaHandler.Dispose();
+        await Task.Delay(100);
         Task.Run(() => bus.Publish(new GameStarted()));
-        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, CancellationToken.None);
+        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, 10, CancellationToken.None);
 
         var matrix = CreateRgbLedMatrix();
-        
+
         var canvas = matrix.CreateOffscreenCanvas();
         _snakeGameCtx = _snakeGame.CreateGameContext();
-        
+
         Task.Run(RunStatusTick);
         do
         {
@@ -133,11 +145,13 @@ public class GameHostedService(
             }
             matrix.SwapOnVsync(canvas);
         } while (!_snakeGameCtx.Dead);
-        
+
         canvas.Clear();
         matrix.Dispose();
-        
+
         Task.Run(() => bus.Publish(new GameEnded(_snakeGameCtx.Score)));
+
+        await mediaHandler.PlayGif("gameover.gif", 40, 1, false, 2, CancellationToken.None);
 
         _cubeCtx.State = State.Idle;
         Task.Run(mediaHandler.StartCycle);
@@ -147,13 +161,14 @@ public class GameHostedService(
     {
         _cubeCtx.State = State.Playing;
         mediaHandler.Dispose();
-        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, CancellationToken.None);
+        await Task.Delay(100);
+        await mediaHandler.PlayGif("countdown.gif", 40, 1, false, 10, CancellationToken.None);
 
         var matrix = CreateRgbLedMatrix();
-        
+
         var canvas = matrix.CreateOffscreenCanvas();
         _achtungGameCtx = _achtungGame.CreateGameContext();
-        
+
         do
         {
             for (var x = 0; x < _achtungGameCtx.Map.GetLength(0); x++)
@@ -197,7 +212,7 @@ public class GameHostedService(
             _achtungGameCtx = _achtungGame.Loop(_achtungGameCtx);
             matrix.SwapOnVsync(canvas);
         } while (!_achtungGameCtx.Players.Any(p => p.Dead));
-        
+
         var winner = _achtungGameCtx.Players.First(p => !p.Dead);
         Task.Run(() => bus.Publish(new MultiPlayerGameEnded(
             winner.Color == LedCube.Games.Achtung.GameObject.RedDot ? "red" : "blue")));
@@ -213,7 +228,7 @@ public class GameHostedService(
             await Task.Delay(5);
             matrix.SwapOnVsync(canvas);
         }
-        
+
         canvas.Clear();
         matrix.Dispose();
 
@@ -221,10 +236,30 @@ public class GameHostedService(
         Task.Run(mediaHandler.StartCycle);
     }
 
+    private async Task StartArtsyFartsy()
+    {
+        _cubeCtx.State = State.PlayingArtsyFartsy;
+        mediaHandler.Dispose();
+        await Task.Delay(100);
+        await mediaHandler.PlayGif("bobross.gif", 40, 1, false, 3, CancellationToken.None);
+        Task.Run(artsyFartsyRunner.Run);
+    }
+
+    private async Task StopArtsyFartsy()
+    {
+        await artsyFartsyRunner.Stop();
+        _cubeCtx.State = State.Idle;
+        await Task.Delay(100);
+        Task.Run(mediaHandler.StartCycle);
+    }
+
     private async Task RunDoom()
     {
-        await Task.Run(DoomGame.Instance.RunAsync);
-    } 
+        _cubeCtx.State = State.Playing;
+        mediaHandler.Dispose();
+        await Task.Delay(100);
+        await Task.Run(() => DoomGame.Instance.RunAsync(GameMode.Shareware, "/home/dietpi/wads/doom1.wad"));
+    }
 
     private async Task RunStatusTick()
     {
@@ -234,7 +269,7 @@ public class GameHostedService(
             await Task.Delay(1000);
         } while (!_snakeGameCtx.Dead);
     }
-    
+
     private static RGBLedMatrix CreateRgbLedMatrix()
     {
         return new RGBLedMatrix(new RGBLedMatrixOptions
@@ -244,7 +279,7 @@ public class GameHostedService(
             ChainLength = 5,
             HardwareMapping = "adafruit-hat-pwm",
             Brightness = 80,
-            GpioSlowdown = 2
+            GpioSlowdown = 2,
         });
     }
 }

@@ -9,11 +9,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MassTransit" Version="8.3.0" />
-        <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="8.3.0" />
+        <PackageReference Include="MassTransit" Version="8.3.4" />
+        <PackageReference Include="MassTransit.Azure.ServiceBus.Core" Version="8.3.4" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
         <PackageReference Include="Gamepad" Version="1.1.0" />
-        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+        <PackageReference Include="SixLabors.ImageSharp" Version="3.1.6" />
     </ItemGroup>
 
     <ItemGroup>

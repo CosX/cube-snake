@@ -1,4 +1,5 @@
-﻿using LedCube;
+﻿using Cube.Contracts;
+using LedCube;
 using LedCube.Games.ArtsyFartsy;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,14 +11,14 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddMassTransit(x =>
         {
             x.SetKebabCaseEndpointNameFormatter();
-            x.AddConsumer<PlaceMyArtsyFartsyPixel>();
-            x.UsingAzureServiceBus((context,cfg) =>
+            x.AddConsumer<ArtsyFartsyPixelConsumer>();
+            x.UsingAzureServiceBus((context, cfg) =>
             {
-                cfg.Host("");
-                
-                cfg.SubscriptionEndpoint<PlaceMyArtsyFartsyPixel>("game-started", e =>
+                cfg.Host(Environment.GetEnvironmentVariable("AzureServiceBusConnectionString"));
+
+                cfg.SubscriptionEndpoint<ArtsyFartsyPixel>("artsy-fartsy-pixel", e =>
                 {
-                    e.ConfigureConsumer<PlaceMyArtsyFartsyPixel>(context);
+                    e.ConfigureConsumer<ArtsyFartsyPixelConsumer>(context);
                     e.ConfigureDeadLetterQueueDeadLetterTransport();
                     e.ConfigureDeadLetterQueueErrorTransport();
                 });
@@ -26,6 +27,8 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddHostedService<GameHostedService>();
         services.AddSingleton<CubeContext>();
         services.AddSingleton<MediaHandler>();
+        services.AddSingleton<ArtsyFartsyInstance>();
+        services.AddSingleton<ArtsyFartsyRunner>();
     })
     .Build();
 

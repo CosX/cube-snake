@@ -6,11 +6,12 @@ using Color = RPiRgbLEDMatrix.Color;
 
 namespace LedCube;
 
-public class MediaHandler(CancellationTokenSource cancellationTokenSource)
+public class MediaHandler
 {
     private bool IsPlayingGame;
+    private CancellationTokenSource cancellationTokenSource;
     private readonly ScreenSaver _defaultScreenSaver = new("martin_snake_5_sides.gif", 80, 5);
-    
+
     private readonly IEnumerable<ScreenSaver> _defaultScreenSavers =
     [
         new ScreenSaver("this-is-fine.gif", 30),
@@ -19,7 +20,7 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
         new ScreenSaver("star-wars.gif", 40),
         new ScreenSaver("outline.gif", 100)
     ];
-    
+
     private readonly IEnumerable<ScreenSaver> _christmasScreenSavers =
     [
         new ScreenSaver("campfire.gif", 50),
@@ -47,16 +48,19 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
             var command = displayDefault ? _defaultScreenSaver : screensavers.ElementAt(rnd.Next(0, screensavers.Count));
             cancellationTokenSource = new CancellationTokenSource();
             cancellationTokenSource.CancelAfter(30_000);
-            try {
-                await PlayGif(command.Image, command.Brightness, command.Chain, true, cancellationTokenSource.Token);
-            } catch (OperationCanceledException){
+            try
+            {
+                await PlayGif(command.Image, command.Brightness, command.Chain, true, 1.0, cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
             }
 
             displayDefault = !displayDefault;
         } while (!IsPlayingGame);
     }
 
-    public async Task PlayGif(string path, int brightness, int chain, bool loop, CancellationToken cancellationToken)
+    public async Task PlayGif(string path, int brightness, int chain, bool loop, double speedMultiplier, CancellationToken cancellationToken)
     {
         using var matrix = new RGBLedMatrix(new RGBLedMatrixOptions
         {
@@ -70,7 +74,7 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
         var canvas = matrix.CreateOffscreenCanvas();
 
         Configuration.Default.PreferContiguousImageBuffers = true;
-        using var image = Image.Load<Rgb24>("images/" + path);
+        using var image = Image.Load<Rgba32>("images/" + path);
         image.Mutate(o => o.Resize(canvas.Width, canvas.Height));
 
         var frames = image.Frames
@@ -83,22 +87,34 @@ public class MediaHandler(CancellationTokenSource cancellationTokenSource)
 
         var frame = -1;
 
-        while (!cancellationToken.IsCancellationRequested || (!loop && frame < frames.Length - 1))
+        do
         {
-            frame = (frame + 1) % frames.Length;
-            var data = frames[frame].Pixels.Select(p => new Color(p.R, p.G, p.B)).ToArray();
-            canvas.SetPixels(0, 0, canvas.Width, canvas.Height, data);
+            for (int i = 0; i < frames.Length; i++)
+            {
+                frame = i;
+                var data = frames[frame].Pixels.Select(p => new Color(p.R, p.G, p.B)).ToArray();
+                canvas.SetPixels(0, 0, canvas.Width, canvas.Height, data);
+                await Task.Run(() => matrix.SwapOnVsync(canvas), cancellationToken);
 
-            await Task.Run(() => matrix.SwapOnVsync(canvas), cancellationToken);
-            await Task.Delay(frames[frame].Delay, cancellationToken);
+                // Adjust delay based on speedMultiplier
+                int adjustedDelay = (int)(frames[frame].Delay * speedMultiplier);
+                await Task.Delay(adjustedDelay, cancellationToken);
+
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+            }
         }
+        while (loop);
+        canvas.Clear();
+        matrix.Dispose();
     }
 
     public void Dispose()
     {
         IsPlayingGame = true;
-        cancellationTokenSource.Cancel();
-        cancellationTokenSource.Dispose();
+        cancellationTokenSource?.Cancel();
+        cancellationTokenSource?.Dispose();
+        cancellationTokenSource = new CancellationTokenSource();
     }
 }
 
